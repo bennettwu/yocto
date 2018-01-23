@@ -1,0 +1,121 @@
+# !/bin/sh
+# set -x
+
+CURRENT_WORK_DIR=`pwd`
+echo ${CURRENT_WORK_DIR}
+
+if [ ! -d ./sources ]; then
+	mkdir -p sources
+fi
+
+cd sources
+
+if [ ! -d ./poky ]; then
+	git clone git://git.yoctoproject.org/poky -b rocko
+fi
+
+if [ ! -d ./meta-intel ]; then
+	git clone git://git.yoctoproject.org/meta-intel -b rocko
+fi
+
+if [ ! -d ./meta-java ]; then
+	git clone git://git.yoctoproject.org/meta-java -b master
+fi
+
+if [ ! -d ./meta-virtualization ]; then
+	git clone git://git.yoctoproject.org/meta-virtualization -b rocko
+fi
+
+if [ ! -d ./meta-openembedded ]; then
+	git clone git://git.openembedded.org/meta-openembedded -b rocko
+fi
+
+if [ ! -d ./meta-nodejs ]; then
+	git clone https://github.com/imyller/meta-nodejs -b morty
+fi
+
+if [ ! -d ./meta-nodejs-contrib ]; then
+	git clone https://github.com/imyller/meta-nodejs-contrib -b morty
+fi
+
+cd ..
+
+
+if [ ! -d ./build ]; then
+	mkdir -p build
+fi
+
+if [ -f ./build/conf/local.conf ]; then
+	rm -f ./build/conf/local.conf
+fi
+
+cd ${CURRENT_WORK_DIR}/sources/poky/
+source ./oe-init-build-env ${CURRENT_WORK_DIR}/build
+#bitbake
+#pwd
+sed -e "s,MACHINE ??=.*,MACHINE ??= \"intel-corei7-64\",g" -i ./conf/local.conf
+sed -e "s,PACKAGE_CLASSES ?=.*,PACKAGE_CLASSES ?= \"package_ipk\",g" -i ./conf/local.conf
+
+cat >> ./conf/local.conf <<EOF
+###### meta-intel
+DEFAULTTUNE = "corei7-64"
+require conf/multilib.conf
+MULTILIBS = "multilib:lib32"
+DEFAULTTUNE_virtclass-multilib-lib32 = "corei7-32"
+#GLIBC_GENERATE_LOCALES = "en_US.UTF-8" 
+#IMAGE_INSTALL_append += " gstreamer1.0-plugins-ugly gstreamer1.0-libav"
+PREFERRED_VERSION_linux-intel = "4.14%"
+
+###### meta-java
+# Possible provider: cacao-initial-native and jamvm-initial-native
+PREFERRED_PROVIDER_virtual/java-initial-native = "cacao-initial-native"
+# Possible provider: cacao-native and jamvm-native
+PREFERRED_PROVIDER_virtual/java-native = "jamvm-native"
+# Optional since there is only one provider for now
+PREFERRED_PROVIDER_virtual/javac-native = "ecj-bootstrap-native"
+
+##### meta-virtualization
+DISTRO_FEATURES_append += " virtualization"
+#SKIP_META_VIRT_SANITY_CHECK = 1
+
+#####
+DISTRO_FEATURES_append += " systemd"
+
+EOF
+
+if [ -f ./conf/bblayers.conf ]; then
+	#cat ./conf/bblayers.conf
+	rm -f ./conf/bblayers.conf
+fi
+
+cat >> ./conf/bblayers.conf <<EOF
+# LAYER_CONF_VERSION is increased each time build/conf/bblayers.conf
+# changes incompatibly
+LCONF_VERSION = "6"
+
+BBPATH = "\${TOPDIR}"
+BBFILES ?= ""
+
+BBLAYERS ?= " \\
+  $CURRENT_WORK_DIR/sources/poky/meta \\
+  $CURRENT_WORK_DIR/sources/poky/meta-poky \\
+  $CURRENT_WORK_DIR/sources/poky/meta-yocto-bsp \\
+  $CURRENT_WORK_DIR/sources/meta-openembedded/meta-oe \\
+  $CURRENT_WORK_DIR/sources/meta-openembedded/meta-webserver  \\
+  $CURRENT_WORK_DIR/sources/meta-openembedded/meta-networking  \\
+  $CURRENT_WORK_DIR/sources/meta-openembedded/meta-python \\
+  $CURRENT_WORK_DIR/sources/meta-openembedded/meta-multimedia \\
+  $CURRENT_WORK_DIR/sources/meta-openembedded/meta-gnome \\
+  $CURRENT_WORK_DIR/sources/meta-openembedded/meta-filesystems \\
+  $CURRENT_WORK_DIR/sources/meta-openembedded/meta-xfce \\
+  $CURRENT_WORK_DIR/sources/meta-openembedded/meta-perl \\
+  $CURRENT_WORK_DIR/sources/meta-nodejs \\
+  $CURRENT_WORK_DIR/sources/meta-nodejs-contrib \\
+  $CURRENT_WORK_DIR/sources/meta-intel \\
+  $CURRENT_WORK_DIR/sources/meta-virtualization \\
+  $CURRENT_WORK_DIR/sources/meta-java \\
+  "
+EOF
+
+
+
